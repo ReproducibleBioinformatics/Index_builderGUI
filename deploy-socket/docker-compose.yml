@@ -1,0 +1,62 @@
+name: genome-index-service
+
+# Sibling containers: the service runs in a container and uses the HOST's Docker
+# to build the tool images and run the indexing containers next to itself.
+# Not privileged, no inner daemon, no nested networking.
+#
+# Run from the PROJECT ROOT (the build context needs app/ and tools/):
+#
+#   export GIS_DATA_DIR=/srv/genome-index-service/data
+#   sudo mkdir -p "$GIS_DATA_DIR"
+#   docker compose -f deploy-socket/docker-compose.yml up --build -d
+#
+# On Windows, use setup.cmd / gis.cmd instead - they also fill in
+# GIS_DATA_HOST_BIND (see below).
+#
+# THE DATA PATH
+# The daemon is outside this container, so it resolves bind mounts on its own
+# side. The data directory is mounted at a fixed path inside the container
+# (/workspace/data, same as every other mode) - that part is a normal bind and
+# needs nothing special. Separately, when the *service* later asks that same
+# daemon to bind the data directory into a tool container (bowtie2, STAR, ...),
+# it has to hand the daemon a path *the daemon* can resolve, which is not
+# necessarily this container's own view of the mount. That value is
+# DATA_HOST_BIND:
+#   - Linux/macOS: the same absolute host path as GIS_DATA_DIR (the default).
+#   - Docker Desktop for Windows: the //<drive>/... form Docker Desktop expects
+#     for sibling-container binds, e.g. //c/Users/you/genome-index-service/data.
+#     setup.cmd computes this automatically and writes GIS_DATA_HOST_BIND.
+#
+# SECURITY
+# Mounting /var/run/docker.sock gives this container control of the host's
+# Docker, which is effectively root on the host. That is inherent: the service
+# exists to build and run containers. Fine on a machine you administer; if not
+# acceptable, use the native install in deploy-server/ instead.
+
+services:
+  gis:
+    build:
+      context: ..
+      dockerfile: deploy-socket/Dockerfile
+    image: gis-socket:latest
+    container_name: genome-index-service
+    restart: unless-stopped
+    environment:
+      ADMIN_PORT: "8888"
+      USER_PORT: "8000"
+      DOCKER_HOST: unix:///var/run/docker.sock
+      DATA_DIR: /workspace/data
+      DATA_HOST_BIND: ${GIS_DATA_HOST_BIND:-${GIS_DATA_DIR:-/srv/genome-index-service/data}}
+      INDEX_THREADS: ${INDEX_THREADS:-4}
+      DNA_PREFERENCE: ${DNA_PREFERENCE:-primary_assembly,toplevel}
+      HOST_UID: ${HOST_UID:-}
+      HOST_GID: ${HOST_GID:-}
+    ports:
+      # Configured in .env (written by ./setup.sh). The admin interface defaults
+      # to localhost only, because there is no login: reach it through an SSH
+      # tunnel or your own authenticating proxy.
+      - "${GIS_ADMIN_BIND:-127.0.0.1}:${GIS_ADMIN_PORT:-8888}:8888"
+      - "${GIS_USER_BIND:-0.0.0.0}:${GIS_USER_PORT:-8000}:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${GIS_DATA_DIR:-/srv/genome-index-service/data}:/workspace/data

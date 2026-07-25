@@ -1,0 +1,45 @@
+name: genome-index-service
+
+# One self-contained Docker-in-Docker container. The Docker daemon runs inside
+# it and builds/runs the aligner images there. The host Docker socket is never
+# mounted or shared. Nothing except Docker Desktop needs to be on the host.
+#
+#   admin GUI : http://localhost:8888
+#   user  GUI : http://localhost:8000
+#
+# NO persistent Docker volumes. The compose folder itself is bind-mounted into
+# the container (and shared with the inner Docker daemon), and every result and
+# download - genomes, GTFs, tool Dockerfiles, job logs, and the generated
+# indexes - is written to the ./data subfolder right next to this file, directly
+# visible on your machine.
+#
+# Because there is no volume for the inner daemon's image store, built tool
+# images are rebuilt after "docker compose down". That is the trade-off for
+# keeping nothing persistent.
+
+services:
+  gis:
+    build: .
+    image: gis:latest
+    container_name: genome-index-service
+    privileged: true                 # required for Docker-in-Docker
+    restart: unless-stopped
+    environment:
+      ADMIN_PORT: "8888"
+      USER_PORT: "8000"
+      # Inside the container the data always lives here; the host side is the
+      # GIS_DATA_DIR bind below.
+      DATA_DIR: /workspace/data
+      SEED_TOOLS_DIR: /app/seed-tools
+      INDEX_THREADS: ${INDEX_THREADS:-4}
+      DNA_PREFERENCE: ${DNA_PREFERENCE:-primary_assembly,toplevel}
+      HOST_UID: ${HOST_UID:-}
+      HOST_GID: ${HOST_GID:-}
+    ports:
+      # Configured in .env (written by ./setup.sh). The admin interface defaults
+      # to localhost only, because there is no login.
+      - "${GIS_ADMIN_BIND:-127.0.0.1}:${GIS_ADMIN_PORT:-8888}:8888"
+      - "${GIS_USER_BIND:-0.0.0.0}:${GIS_USER_PORT:-8000}:8000"
+    volumes:
+      # Only the data directory is bound in, so you can put it wherever you like.
+      - ${GIS_DATA_DIR:-./data}:/workspace/data

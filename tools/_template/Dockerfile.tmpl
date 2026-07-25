@@ -1,0 +1,19 @@
+# Starting point for a new tool. Edit before adding. No conda/mamba.
+# Prefer a tagged release: either a precompiled binary from a GitHub release, or
+# compile from the tagged source. The image only needs the tool on PATH; the
+# indexing command is supplied at run time.
+FROM debian:bookworm-slim
+ARG TOOL_VERSION=__VERSION__
+
+# Option A - precompiled binary from a tagged GitHub release:
+# ADD https://github.com/ORG/REPO/releases/download/v${TOOL_VERSION}/__TOOL__-linux-x86_64 /usr/local/bin/__TOOL__
+# RUN chmod +x /usr/local/bin/__TOOL__ && __TOOL__ --version
+
+# Option B - compile from the tagged source:
+# RUN apt-get update \
+#  && apt-get install -y --no-install-recommends ca-certificates wget make gcc zlib1g-dev \
+#  && wget -qO /tmp/src.tar.gz "https://github.com/ORG/REPO/archive/refs/tags/v${TOOL_VERSION}.tar.gz" \
+#  && tar -xzf /tmp/src.tar.gz -C /tmp \
+#  && make -C /tmp/REPO-${TOOL_VERSION} \
+#  && cp /tmp/REPO-${TOOL_VERSION}/__TOOL__ /usr/local/bin/__TOOL__ \
+#  && rm -rf /tmp/* /var/lib/apt/lists/*

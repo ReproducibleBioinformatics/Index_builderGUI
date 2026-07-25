@@ -1,0 +1,5 @@
+# Runtime data lives in ./data and must never be copied into the image.
+data/
+**/__pycache__/
+**/*.pyc
+.git/

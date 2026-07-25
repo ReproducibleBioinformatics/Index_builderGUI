@@ -1,0 +1,4 @@
+[
+  {"name": "threads", "default": "4"},
+  {"name": "sjdb_overhang", "default": "100"}
+]

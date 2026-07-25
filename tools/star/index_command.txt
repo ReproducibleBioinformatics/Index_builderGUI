@@ -1,0 +1,1 @@
+STAR --runMode genomeGenerate --genomeDir '{index_dir}' --genomeFastaFiles '{fasta}' --sjdbGTFfile '{gtf}' --sjdbOverhang {sjdb_overhang} --runThreadN {threads} --genomeSAindexNbases {sa_index_nbases}

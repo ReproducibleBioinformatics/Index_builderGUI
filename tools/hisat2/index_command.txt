@@ -1,0 +1,3 @@
+hisat2_extract_splice_sites.py '{gtf}' > '{index_dir}/splicesites.txt'
+hisat2_extract_exons.py '{gtf}' > '{index_dir}/exons.txt'
+hisat2-build -p {threads} --ss '{index_dir}/splicesites.txt' --exon '{index_dir}/exons.txt' '{fasta}' '{index_dir}/genome'

@@ -1,0 +1,6 @@
+# Pure-Python stack: nothing here needs a C or Rust toolchain to install, so
+# the image builds cleanly on Alpine (docker:dind) using wheels only.
+flask==3.1.0
+waitress==3.0.2
+requests==2.32.3
+docker==7.1.0

@@ -1,0 +1,1 @@
+bwa index -p '{index_dir}/genome' '{fasta}'

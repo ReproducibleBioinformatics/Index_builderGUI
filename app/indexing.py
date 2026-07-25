@@ -91,4 +91,4 @@ def build_command(tool, fasta, gtf, index_dir, genome_length, command_template,
         out = out.replace("{" + name + "}", value)
 
     script = f"set -euo pipefail\nmkdir -p '{index_dir}'\n{out}\n"
-    return ["bash", "-lc", script]
+    return ["bash", "-c", script]

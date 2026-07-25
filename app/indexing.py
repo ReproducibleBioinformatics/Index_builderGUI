@@ -58,7 +58,7 @@ def valid_param_value(value):
 
 def build_command(tool, fasta, gtf, index_dir, genome_length, command_template,
                   params, default_threads, default_sjdb_overhang):
-    """Return ["bash", "-lc", script] for the tool's command template with all
+    """Return ["bash", "-c", script] for the tool's command template with all
     placeholders filled in. `params` (name -> value) override the defaults."""
     if not (command_template and command_template.strip()):
         raise ValueError(

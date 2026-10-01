@@ -13,9 +13,9 @@ import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
-from config import JOBS_DIR
+from config import JOBS_DIR, JOB_WORKERS
 
-_executor = ThreadPoolExecutor(max_workers=2)
+_executor = ThreadPoolExecutor(max_workers=JOB_WORKERS)
 _jobs = {}                 # jobs owned (created) by this process
 _lock = threading.Lock()
 

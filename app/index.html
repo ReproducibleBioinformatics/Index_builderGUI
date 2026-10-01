@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light" data-palette="default">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Genome Index Service</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/jupydo.png') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+</head>
+<body data-admin="{{ 'true' if is_admin else 'false' }}" data-base="{{ request.script_root }}">
+
+  <div class="topbar">
+    <div class="brand">
+      <img src="{{ url_for('static', filename='img/jupydo.png') }}" class="logo" alt="JupyDo" title="JupyDo" />
+      <span class="brand-text"><span class="acgt"><b>A</b><b>C</b><b>G</b><b>T</b></span>Genome Index Service</span>
+    </div>
+    <div class="spacer"></div>
+    <span class="dstatus">
+      <span class="dot {{ 'ok' if docker_ok else 'off' }}" id="docker-dot"></span>
+      <span id="docker-label">docker {{ 'ready' if docker_ok else 'unreachable' }}</span>
+    </span>
+    <select class="theme-select" id="mode-select" title="Light or dark">
+      <option value="light">Light</option>
+      <option value="dark">Dark</option>
+    </select>
+    <select class="theme-select" id="palette-select" title="Colour vision palette">
+      <option value="default">Default colours</option>
+      <option value="deuteranopia">Deuteranopia</option>
+      <option value="protanopia">Protanopia</option>
+      <option value="tritanopia">Tritanopia</option>
+      <option value="monochrome">Monochrome</option>
+    </select>
+    <span class="badge {{ role }}">{{ role }}</span>
+  </div>
+
+  <div class="wrap">
+    <div class="tabs">
+      <button class="tab active" data-tab="generate">Generate index</button>
+      <button class="tab" data-tab="jobs">Jobs <span class="tab-badge zero" id="badge-jobs">0</span></button>
+      <button class="tab" data-tab="indexes">Existing indexes</button>
+      <button class="tab" data-tab="tools">Available tools</button>
+      <button class="tab" data-tab="requests">Requests <span class="tab-badge zero" id="badge-requests">0</span></button>
+      <button class="tab" data-tab="add" data-admin-only>Add tool</button>
+    </div>
+
+    <!-- ===================== GENERATE ===================== -->
+    <section id="tab-generate" class="tabpane active">
+      <div class="panel panel-split">
+        <div class="panel-head">
+          <h2>Build a genome index</h2>
+          <p class="hint">Pick a tool and version, then the organism and Ensembl release.
+            The FASTA and GTF are fetched from Ensembl automatically (DNA preference: {{ dna_pref }}).
+            Check sources is required before generating.</p>
+        </div>
+
+        <div class="panel-body" id="generate-body">
+        <div class="grid2">
+          <div class="field">
+            <label for="tool">Tool</label>
+            <select id="tool"><option value="">Loading...</option></select>
+          </div>
+          <div class="field">
+            <label for="version">Tool version</label>
+            <select id="version"><option value="">Select a tool first</option></select>
+          </div>
+        </div>
+
+        <div class="field" id="params-section" style="display:none;">
+          <label>Parameters <span class="sub">(defaults shown; change if needed)</span></label>
+          <div class="params-grid" id="params-grid"></div>
+        </div>
+
+        <div class="grid2">
+          <div class="field">
+            <label for="organism">Organism <span class="sub">(type to search, e.g. mus)</span></label>
+            <input type="text" id="organism" autocomplete="off"
+                   placeholder="mus musculus, drosophila, homo sapiens..." />
+            <div class="ac" id="organism-ac"></div>
+            <input type="hidden" id="species" />
+          </div>
+          <div class="field">
+            <label for="release">Organism release <span class="sub">(depends on the organism)</span></label>
+            <select id="release" disabled><option value="">Choose an organism first</option></select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Resolved source files</label>
+          <div class="preview" id="resolve-preview">Choose an organism and release, then Check sources.</div>
+        </div>
+
+        <div class="checkline field" data-admin-only>
+          <input type="checkbox" id="force" />
+          <label for="force" style="text-transform:none;letter-spacing:0;font-family:var(--sans);font-weight:400;color:var(--ink-soft);margin:0;">
+            Rebuild even if the index already exists
+          </label>
+        </div>
+
+        </div><!-- /panel-body -->
+
+        <div class="action-bar">
+          <button class="btn" id="btn-check">Check sources</button>
+          <button class="btn btn-primary" id="btn-submit" disabled>Generate index</button>
+          <span class="submit-note" id="submit-note">Run Check sources first.</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Recent jobs</h2>
+        <p class="hint">Live progress. Click a job to see its log; the Jobs tab has the full list.</p>
+        <div class="jobs-container" data-limit="6"><div class="empty">No jobs yet.</div></div>
+      </div>
+    </section>
+
+    <!-- ===================== JOBS ===================== -->
+    <section id="tab-jobs" class="tabpane">
+      <div class="panel">
+        <h2>System check</h2>
+        <p class="hint">A quick look at the Docker daemon, name resolution and
+          network from inside a container, Ensembl, and the data folder. Runs only
+          when you ask: nothing here slows down builds or indexing.</p>
+        <div class="btn-row" style="margin-bottom:10px;">
+          <button class="btn" id="btn-diag">Run check</button>
+          <span class="submit-note" id="diag-note"></span>
+        </div>
+        <div id="diag-results"></div>
+      </div>
+
+      <div class="panel">
+        <h2>Jobs</h2>
+        <p class="hint">Downloads, image builds and indexing. Click a job to expand its log.</p>
+        <div class="jobs-container"><div class="empty">No jobs yet.</div></div>
+      </div>
+    </section>
+
+    <!-- ===================== EXISTING INDEXES ===================== -->
+    <section id="tab-indexes" class="tabpane">
+      <div class="panel">
+        <h2>Existing indexes</h2>
+        <p class="hint">Completed indexes on disk, under data/indexes/.</p>
+        <div id="indexes-table"><div class="empty">Loading...</div></div>
+      </div>
+    </section>
+
+    <!-- ===================== AVAILABLE TOOLS ===================== -->
+    <section id="tab-tools" class="tabpane">
+      <div class="panel">
+        <h2>Available tools</h2>
+        <p class="hint">Discovered from the tools folder. Status reflects the image on the Docker daemon.</p>
+        <div id="tools-table"><div class="empty">Loading...</div></div>
+      </div>
+    </section>
+
+    <!-- ===================== REQUESTS ===================== -->
+    <section id="tab-requests" class="tabpane">
+      <div class="panel">
+        <h2>Requests</h2>
+        <p class="hint" data-admin-only>Pending requests from users. "Add" opens the Add tool tab pre-filled.</p>
+        <p class="hint" data-user-only>Ask the administrator for a tool or a specific version.</p>
+
+        <div data-user-only>
+          <div class="grid2">
+            <div class="field">
+              <label for="req-tool">Tool name</label>
+              <input type="text" id="req-tool" placeholder="minimap2" autocomplete="off" />
+            </div>
+            <div class="field">
+              <label for="req-version">Version</label>
+              <input type="text" id="req-version" placeholder="2.28" autocomplete="off" />
+            </div>
+          </div>
+          <div class="field">
+            <label for="req-notes">Notes <span class="sub">(optional)</span></label>
+            <input type="text" id="req-notes" placeholder="why you need it" autocomplete="off" />
+          </div>
+          <div class="btn-row" style="margin-bottom:14px;">
+            <button class="btn btn-primary" id="btn-request">Send request</button>
+          </div>
+        </div>
+
+        <div id="requests"><div class="empty">Loading...</div></div>
+      </div>
+    </section>
+
+    <!-- ===================== ADD TOOL (admin) ===================== -->
+    <section id="tab-add" class="tabpane">
+      <div class="panel">
+        <h2>Add a tool / version</h2>
+        <p class="hint">A tool needs three things: a Dockerfile, an index command, and
+          (optionally) parameters. Folders are created automatically and the tool becomes
+          selectable for indexing.</p>
+
+        <div class="grid2">
+          <div class="field">
+            <label for="add-tool">Tool name</label>
+            <input type="text" id="add-tool" placeholder="minimap2" autocomplete="off" />
+          </div>
+          <div class="field">
+            <label for="add-version">Version</label>
+            <input type="text" id="add-version" placeholder="2.28" autocomplete="off" />
+          </div>
+        </div>
+        <div class="field">
+          <label for="add-dockerfile">Dockerfile</label>
+          <textarea id="add-dockerfile" rows="10" spellcheck="false" placeholder="FROM debian:bookworm-slim"></textarea>
+        </div>
+        <div class="field">
+          <label for="add-command">Index command <span class="sub">(required unless already stored for this tool)</span></label>
+          <textarea id="add-command" rows="3" spellcheck="false"
+                    placeholder="minimap2 -t {threads} -d {index_dir}/genome.mmi {fasta}"></textarea>
+        </div>
+        <div class="field">
+          <label for="add-params">Parameters <span class="sub">(optional; one per line: name=default)</span></label>
+          <textarea id="add-params" rows="3" spellcheck="false" placeholder="threads=4"></textarea>
+        </div>
+        <div class="btn-row">
+          <button class="btn" id="btn-template">Load template</button>
+          <button class="btn" id="btn-add">Add tool</button>
+          <button class="btn btn-primary" id="btn-add-build">Add and build image</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Placeholders</h2>
+        <p class="hint"><strong>{fasta}</strong> and <strong>{gtf}</strong> are filled in by
+          the service: once the user picks an organism and release, the real Ensembl files
+          are resolved, downloaded and decompressed, and their paths are substituted here.
+          You never declare them. Parameters are only for tunables.</p>
+        <table>
+          <tbody>
+            <tr><td class="mono">{fasta}</td><td>Genome FASTA (downloaded automatically)</td></tr>
+            <tr><td class="mono">{gtf}</td><td>Annotation GTF (downloaded automatically)</td></tr>
+            <tr><td class="mono">{index_dir}</td><td>Output folder (created for you)</td></tr>
+            <tr><td class="mono">{threads}</td><td>CPU threads</td></tr>
+            <tr><td class="mono">{sjdb_overhang}</td><td>STAR sjdbOverhang</td></tr>
+            <tr><td class="mono">{sa_index_nbases}</td><td>STAR genomeSAindexNbases (auto from genome size)</td></tr>
+            <tr><td class="mono">{genome_length}</td><td>Total genome length</td></tr>
+            <tr><td class="mono">{name}</td><td>Any parameter you declare above</td></tr>
+          </tbody>
+        </table>
+        <p class="hint" style="margin-top:12px;">Anything you declare in Parameters shows up as an
+          editable field in the index form, pre-filled with its default.</p>
+      </div>
+    </section>
+  </div>
+
+  <div class="footer-credit">
+    <a class="lab-logo-link" href="https://reproduciblebioinformatics.github.io/"
+       target="_blank" rel="noopener noreferrer" title="Reproducible &amp; Bioinformatics Lab">
+      <img src="{{ url_for('static', filename='img/lab.png') }}" alt="Reproducible &amp; Bioinformatics Lab" />
+    </a>
+    <div class="footer-text">
+      <span class="footer-title">Reproducible &amp; Bioinformatics Lab</span>
+      <span class="footer-links">
+        <a href="https://reproduciblebioinformatics.github.io/" target="_blank" rel="noopener noreferrer">Website</a>
+        <span class="sep">&middot;</span>
+        <a href="https://github.com/ReproducibleBioinformatics" target="_blank" rel="noopener noreferrer">GitHub</a>
+        <span class="sep">&middot;</span>
+        <a href="https://github.com/ReproducibleBioinformatics/Jupydo" target="_blank" rel="noopener noreferrer">JupyDo</a>
+      </span>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

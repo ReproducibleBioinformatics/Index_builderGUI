@@ -9,7 +9,7 @@ API expose. One instance runs as admin on 8888 and one as user on 8000, both
 sharing the same data volume and the same inner Docker daemon.
 """
 
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, g, request, jsonify, render_template
 
 import config
 import diagnostics
@@ -23,6 +23,10 @@ import service
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
 
+if config.HUB_MODE:
+    import hubauth  # login through JupyterHub, role from the hub admin flag
+    hubauth.init_app(app)
+
 # Startup (Flask has no async startup hook, so run it once at import). Both the
 # admin and user processes run this; every step is idempotent.
 config.ensure_dirs()
@@ -34,10 +38,22 @@ jobs.load_persisted()
 perms.relax(config.DATA_DIR, config.HOST_UID, config.HOST_GID)
 
 
+def _is_admin():
+    """Admin rights: the hub admin flag in hub mode, else the instance role."""
+    if config.HUB_MODE:
+        return bool(g.hub_user.get("admin"))
+    return config.is_admin_instance()
+
+
+def _username():
+    """The logged-in hub user in hub mode, else None."""
+    return g.hub_user["name"] if config.HUB_MODE else None
+
+
 def _admin_only():
     """Return a (json, 403) tuple if this instance is not the admin one, else
     None."""
-    if not config.is_admin_instance():
+    if not _is_admin():
         return jsonify(
             {"error": "This action is only available on the admin instance."}
         ), 403
@@ -55,8 +71,8 @@ def _body():
 def home():
     return render_template(
         "index.html",
-        role=config.APP_ROLE,
-        is_admin=config.is_admin_instance(),
+        role="admin" if _is_admin() else "user",
+        is_admin=_is_admin(),
         docker_ok=docker_ops.daemon_ready(),
         dna_pref=", ".join(config.DNA_PREFERENCE),
     )
@@ -167,7 +183,7 @@ def api_index():
     release = str(body.get("release", ""))
     # Forcing a rebuild over an existing index is an admin-only capability, so
     # the user instance ignores force_rebuild even if it is sent.
-    force = bool(body.get("force_rebuild", False)) and config.is_admin_instance()
+    force = bool(body.get("force_rebuild", False)) and _is_admin()
 
     try:
         for value in (tool, version, species, release):
@@ -207,10 +223,11 @@ def api_index():
         meta={"tool": tool, "version": version,
               "species": species, "release": release, "params": resolved},
     )
+    owner = _username()  # read now: the worker thread has no request context
     jobs.submit(
         job_id,
         lambda logger: service.run_index_job(
-            tool, version, species, release, force, resolved, logger
+            tool, version, species, release, force, resolved, logger, owner=owner
         ),
     )
     return {"status": "queued", "job_id": job_id}
@@ -387,7 +404,7 @@ def api_tool_request():
     notes = body.get("notes", "")
     if not tool.strip() or not version.strip():
         return jsonify({"error": "Tool and version are required."}), 400
-    payload = discovery.save_request(tool, version, notes, config.APP_ROLE)
+    payload = discovery.save_request(tool, version, notes, _username() or config.APP_ROLE)
     return {"status": "saved", "request": payload}
 
 

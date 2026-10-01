@@ -19,6 +19,7 @@ import docker_ops
 import ensembl
 import indexing
 import perms
+import queue_ops
 
 
 def _now():
@@ -120,7 +121,7 @@ def ensure_tool_image(tool, version, log):
 
 
 def run_index_job(tool, version, species, release, force_rebuild, params,
-                  job_logger):
+                  job_logger, owner=None):
     """Full index pipeline. Sets its own terminal status only for the
     already-exists shortcut; otherwise the job runner marks it completed."""
     idir = discovery.index_dir(tool, version, species, release)
@@ -153,12 +154,25 @@ def run_index_job(tool, version, species, release, force_rebuild, params,
         default_sjdb_overhang=config.STAR_SJDB_OVERHANG,
     )
     job_logger(f"Running {tool} {version} indexing (image {tag})...")
-    code = docker_ops.run_indexing(
-        tag, command,
-        mount_source=config.DATA_HOST_BIND,
-        mount_target=str(config.DATA_DIR),
-        log=job_logger,
-    )
+    if config.JOBQUEUE_URL:
+        # Inside JupyDo: the indexing container goes through the job queue,
+        # which enforces the batch pool's CPU and memory limits.
+        code = queue_ops.run_indexing(
+            tag, command,
+            mount_source=config.DATA_HOST_BIND,
+            mount_target=str(config.DATA_DIR),
+            owner=owner,
+            name=f"index-{tool}-{species}"[:64],
+            cpus=float(params.get("threads") or config.INDEX_THREADS),
+            log=job_logger,
+        )
+    else:
+        code = docker_ops.run_indexing(
+            tag, command,
+            mount_source=config.DATA_HOST_BIND,
+            mount_target=str(config.DATA_DIR),
+            log=job_logger,
+        )
     if code != 0:
         raise RuntimeError(f"Indexing container exited with code {code}.")
 

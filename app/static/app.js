@@ -1,6 +1,8 @@
 "use strict";
 
 const IS_ADMIN = document.body.dataset.admin === "true";
+// URL prefix when served under a path (e.g. /services/genome-index in JupyDo).
+const BASE = document.body.dataset.base || "";
 
 // --------------------------------------------------------------------------- //
 // Helpers
@@ -9,7 +11,7 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
 
 async function api(path, opts = {}) {
-  const res = await fetch(path, { headers: { "Content-Type": "application/json" }, ...opts });
+  const res = await fetch(BASE + path, { headers: { "Content-Type": "application/json" }, ...opts });
   let data = null;
   try { data = await res.json(); } catch (_) { data = null; }
   if (!res.ok) throw new Error((data && data.error) || `HTTP ${res.status}`);

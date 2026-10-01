@@ -49,6 +49,17 @@ APP_PORT = int(os.environ.get("APP_PORT", "8000"))
 
 def is_admin_instance():
     return APP_ROLE == "admin"
+# --- Running inside JupyDo (APP_ROLE=hub) -----------------------------------
+# One instance serves everyone: login goes through JupyterHub OAuth and the
+# role comes from the hub (hub admins get the admin interface). Indexing
+# containers are submitted to the JupyDo job queue instead of being run here.
+HUB_MODE = APP_ROLE == "hub"
+JOBQUEUE_URL = os.environ.get("JOBQUEUE_URL", "").rstrip("/")
+JOBQUEUE_TOKEN = os.environ.get("JOBQUEUE_TOKEN", "")
+INDEX_MEM_GB = float(os.environ.get("INDEX_MEM_GB", "32"))
+INDEX_WALLTIME_MIN = int(os.environ.get("INDEX_WALLTIME_MIN", "1440"))
+JOB_WORKERS = int(os.environ.get("JOB_WORKERS", "2"))
+
 
 # --- Docker -----------------------------------------------------------------
 # The daemon the service talks to. In the Docker-in-Docker packaging this is the

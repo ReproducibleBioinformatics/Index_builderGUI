@@ -4,14 +4,14 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Genome Index Service</title>
-  <link rel="icon" href="/static/img/jupydo.png" />
-  <link rel="stylesheet" href="/static/style.css" />
+  <link rel="icon" href="{{ url_for('static', filename='img/jupydo.png') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
 </head>
-<body data-admin="{{ 'true' if is_admin else 'false' }}">
+<body data-admin="{{ 'true' if is_admin else 'false' }}" data-base="{{ request.script_root }}">
 
   <div class="topbar">
     <div class="brand">
-      <img src="/static/img/jupydo.png" class="logo" alt="JupyDo" title="JupyDo" />
+      <img src="{{ url_for('static', filename='img/jupydo.png') }}" class="logo" alt="JupyDo" title="JupyDo" />
       <span class="brand-text"><span class="acgt"><b>A</b><b>C</b><b>G</b><b>T</b></span>Genome Index Service</span>
     </div>
     <div class="spacer"></div>
@@ -247,7 +247,7 @@
   <div class="footer-credit">
     <a class="lab-logo-link" href="https://reproduciblebioinformatics.github.io/"
        target="_blank" rel="noopener noreferrer" title="Reproducible &amp; Bioinformatics Lab">
-      <img src="/static/img/lab.png" alt="Reproducible &amp; Bioinformatics Lab" />
+      <img src="{{ url_for('static', filename='img/lab.png') }}" alt="Reproducible &amp; Bioinformatics Lab" />
     </a>
     <div class="footer-text">
       <span class="footer-title">Reproducible &amp; Bioinformatics Lab</span>
@@ -263,6 +263,6 @@
 
   <div class="toast" id="toast"></div>
 
-  <script src="/static/app.js"></script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>
